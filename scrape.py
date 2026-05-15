@@ -1,7 +1,7 @@
 import feedparser
 from datetime import datetime
+import os
 
-# Curated feeds for Agents, Local LLMs, and Open Source
 FEEDS = [
     "https://rss.arxiv.org/rss/cs.AI",
     "https://huggingface.co/blog/feed.xml",
@@ -14,39 +14,54 @@ FEEDS = [
 
 def generate_site():
     articles = []
+    print("Starting scrape...")
+    
     for url in FEEDS:
-        try:
-            feed = feedparser.parse(url)
-            for entry in feed.entries[:5]:
-                articles.append({
-                    'title': entry.title,
-                    'link': entry.link,
-                    'source': feed.feed.get('title', 'Unknown Source'),
-                    'date': entry.get('published', 'Recently')
-                })
-        except Exception as e:
-            print(f"Error fetching {url}: {e}")
+        # Adding an agent helps prevent getting blocked by RSS providers
+        feed = feedparser.parse(url, agent='Mozilla/5.0 (AI News Bot)')
+        
+        if not feed.entries:
+            print(f"Warning: No entries found for {url}")
+            continue
+            
+        for entry in feed.entries[:5]:
+            articles.append({
+                'title': entry.title,
+                'link': entry.link,
+                'source': feed.feed.get('title', 'AI Source'),
+                'date': entry.get('published', 'Recent')
+            })
 
-    # Simple HTML Template with Water.css for a clean look
+    # If no articles were found at all, don't overwrite with a blank page
+    if not articles:
+        print("Error: No articles found across all feeds.")
+        return
+
     html_content = f"""
     <!DOCTYPE html>
-    <html>
+    <html lang="en">
     <head>
-        <title>AI & Agentic News Radar</title>
+        <meta charset="UTF-8">
+        <title>AI & Agentic Hub</title>
         <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/water.css@2/out/water.css">
-        <meta charset="utf-8">
+        <style>
+            body {{ max-width: 900px; margin: auto; padding: 20px; }}
+            .card {{ border-bottom: 1px solid #444; padding: 15px 0; }}
+            .source {{ color: #007bff; font-weight: bold; }}
+        </style>
     </head>
     <body>
-        <h1>AI News Hub</h1>
-        <p><i>Automated updates on Local LLMs, Agents, and OSS.</i></p>
-        <p><strong>Last Refresh:</strong> {datetime.now().strftime('%Y-%m-%d %H:%M')} UTC</p>
+        <h1>🚀 AI & Open Source News</h1>
+        <p><strong>Last Updated:</strong> {datetime.now().strftime('%Y-%m-%d %H:%M')} UTC</p>
         <hr>
-        {''.join([f"<div style='margin-bottom: 20px;'><h3><a href='{a['link']}' target='_blank'>{a['title']}</a></h3><small><b>Source:</b> {a['source']} | <b>Date:</b> {a['date']}</small></div>" for a in articles])}
+        {''.join([f"<div class='card'><h3><a href='{a['link']}' target='_blank'>{a['title']}</a></h3><p><span class='source'>{a['source']}</span> | <small>{a['date']}</small></p></div>" for a in articles])}
     </body>
     </html>
     """
+    
     with open("index.html", "w", encoding="utf-8") as f:
         f.write(html_content)
+    print("Successfully generated index.html")
 
 if __name__ == "__main__":
     generate_site()
